@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>紙わざ - 驚くほど簡単なPDF編集</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,fill,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <style>
+        :root {
+            --kami-primary: #2d5d7b;
+            --kami-secondary: #4cae9f;
+            --kami-bg: #fdfdfd;
+            --kami-accent: #e67e22;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #f5f7f9;
+            color: #333;
+        }
+
+        .logo-box {
+            background: linear-gradient(135deg, var(--kami-primary) 0%, var(--kami-secondary) 100%);
+            box-shadow: 0 10px 20px rgba(45, 93, 123, 0.2);
+        }
+
+        .tab-bar {
+            background: #e2e8f0;
+            padding: 4px;
+            border-radius: 16px;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            font-weight: 700;
+            border-radius: 12px;
+            transition: all 0.3s;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: var(--kami-primary);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        .tab-btn svg {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            fill: none;
+        }
+
+        .drop-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 32px;
+            background-color: #fff;
+            transition: all 0.3s;
+        }
+
+        .drop-zone.drag-over {
+            border-color: var(--kami-secondary);
+            background-color: #f0fdfa;
+            transform: scale(1.01);
+        }
+
+        .page-card {
+            border-radius: 16px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .page-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.08);
+        }
+
+        .page-card.selected {
+            border: 3px solid var(--kami-secondary);
+        }
+
+        .selection-check {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--kami-secondary);
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.2s;
+            z-index: 20;
+        }
+
+        .page-card.selected .selection-check {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .btn-kami {
+            background: var(--kami-primary);
+            color: white;
+            border-radius: 14px;
+            padding: 14px 28px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+
+        .btn-kami:hover:not(:disabled) {
+            filter: brightness(1.2);
+            transform: translateY(-2px);
+        }
+
+        .btn-kami:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+        }
+
+        .loader-spin {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--kami-primary);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .modal-enter {
+            animation: modalIn 0.3s ease-out forwards;
+        }
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex flex-col items-center">
+
+    <header class="w-full max-w-4xl flex flex-col items-center mb-12">
+        <!-- ロゴエリア -->
+        <div class="flex items-center gap-5 mb-8">
+            <div class="w-16 h-16 rounded-2xl logo-box flex items-center justify-center">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 17V7C3 5.89543 3.89543 5 5 5H13L21 13V19C21 20.1046 20.1046 21 19 21H7L3 17Z" fill="white" fill-opacity="0.2"/>
+                    <path d="M3 17L7 21M3 17V7C3 5.89543 3.89543 5 5 5H13L21 13V19C21 20.1046 20.1046 21 19 21H7L3 17Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M13 5L21 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <div class="text-left">
+                <h1 class="text-4xl font-black text-slate-800 tracking-tight">紙わざ</h1>
+                <p class="text-xs font-bold text-slate-400 mt-1">PDFを自由自在に、職人品質で。</p>
+            </div>
+        </div>
+
+        <!-- ナビゲーション -->
+        <nav class="tab-bar flex flex-wrap justify-center">
+            <button onclick="switchMode('split')" id="tabSplit" class="tab-btn active">
+                <svg viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 12H17M7 12L10 9M7 12L10 15M17 12L14 9M17 12L14 15" />
+                    <rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 2" />
+                </svg>
+                <span>バラす</span>
+            </button>
+            <button onclick="switchMode('reorder')" id="tabReorder" class="tab-btn">
+                <svg viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+                    <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+                </svg>
+                <span>並べる</span>
+            </button>
+            <button onclick="switchMode('rotate')" id="tabRotate" class="tab-btn">
+                <svg viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M23 4v6h-6" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                </svg>
+                <span>回す</span>
+            </button>
+            <button onclick="switchMode('merge')" id="tabMerge" class="tab-btn">
+                <svg viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="4" width="12" height="12" rx="2" />
+                    <path d="M10 10h10v10H10z" fill="currentColor" fill-opacity="0.1" />
+                    <path d="M10 10h10v10H10z" />
+                </svg>
+                <span>くっつける</span>
+            </button>
+        </nav>
+    </header>
+
+    <main class="w-full max-w-5xl">
+        <!-- アップロードエリア（全機能共通スタイル） -->
+        <section id="uploadSection" class="w-full">
+            <div class="card p-8 md:p-16 text-center bg-white shadow-xl rounded-[40px] border-2 border-slate-50">
+                <div class="drop-zone h-80 flex flex-col items-center justify-center cursor-pointer group" id="dropZoneMain">
+                    <h2 id="uploadText" class="text-3xl md:text-4xl font-black text-slate-800 mb-6 px-4 leading-tight">ここにPDFファイルを<br class="sm:hidden">置いてください</h2>
+                    <div class="flex flex-col items-center gap-4">
+                        <p class="text-slate-500 font-bold text-lg">または、クリックしてファイルを選択</p>
+                        <div class="h-1 w-12 bg-slate-100 rounded-full"></div>
+                        <p class="text-slate-400 font-bold text-sm bg-slate-50 px-6 py-2 rounded-full group-hover:bg-slate-100 transition-colors">
+                            複数のファイルをまとめて追加できます
+                        </p>
+                    </div>
+                    <input type="file" id="fileInputMain" class="hidden" accept="application/pdf" multiple>
+                </div>
+            </div>
+        </section>
+
+        <!-- 編集ビュー (バラす・並べる・回す) -->
+        <section id="editorView" class="hidden space-y-8">
+            <div class="bg-white p-6 rounded-3xl shadow-sm flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <button onclick="resetApp()" class="w-12 h-12 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition" title="戻る">
+                        <span class="material-symbols-rounded text-slate-400">arrow_back</span>
+                    </button>
+                    <div>
+                        <h2 class="text-xl font-black text-slate-800" id="editorTitle">編集画面</h2>
+                        <p class="text-sm text-slate-400 font-bold" id="editorDescription">ページを選んだり、入れ替えたりできます。</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span id="selectionStatus" class="hidden text-sm font-bold text-slate-500 bg-slate-100 px-5 py-2 rounded-full"></span>
+                    <button id="actionBtn" onclick="openSaveModal()" class="btn-kami">
+                        <span id="actionBtnText">新しく作り直す</span>
+                        <span class="material-symbols-rounded">download</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="pageGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-8"></div>
+        </section>
+
+        <!-- くっつける専用リスト表示 -->
+        <section id="mergeEditor" class="hidden w-full max-w-3xl mx-auto space-y-6">
+            <div class="bg-white p-10 rounded-[40px] shadow-xl">
+                <div class="flex items-center justify-between mb-8">
+                    <div class="flex items-center gap-4">
+                        <button onclick="resetApp()" class="w-10 h-10 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition">
+                            <span class="material-symbols-rounded text-slate-400 text-sm">arrow_back</span>
+                        </button>
+                        <h2 class="text-2xl font-black text-slate-800 tracking-tight">結合リスト</h2>
+                    </div>
+                    <button onclick="document.getElementById('fileInputMain').click()" class="text-sm font-bold text-cyan-600 hover:text-cyan-700 flex items-center gap-1 bg-cyan-50 px-4 py-2 rounded-full transition">
+                        <span class="material-symbols-rounded text-lg">add_circle</span>
+                        さらに追加
+                    </button>
+                </div>
+                
+                <div id="mergeList" class="space-y-3 min-h-[100px]">
+                    <!-- ここにファイルリストが追加される -->
+                </div>
+
+                <div class="mt-10 pt-8 border-t border-slate-100">
+                    <button id="mergeBtn" onclick="openSaveModal()" class="btn-kami w-full py-5 justify-center text-lg" disabled>
+                        <span>ファイルを一つにくっつける</span>
+                        <span class="material-symbols-rounded">join_inner</span>
+                    </button>
+                    <p class="text-center text-xs font-bold text-slate-400 mt-4">上のリストをドラッグして順番を変えられます。</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 処理中画面 -->
+    <div id="loader" class="fixed inset-0 bg-slate-900/60 hidden flex items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white p-10 rounded-[32px] flex flex-col items-center gap-5 shadow-2xl">
+            <div class="loader-spin"></div>
+            <p class="font-bold text-slate-800" id="loaderText">仕上げています...</p>
+        </div>
+    </div>
+
+    <!-- 保存ダイアログ -->
+    <div id="saveModal" class="fixed inset-0 bg-slate-900/60 hidden flex items-center justify-center z-[60] backdrop-blur-sm p-4">
+        <div class="bg-white w-full max-w-md rounded-[32px] p-8 shadow-2xl modal-enter">
+            <h3 class="text-2xl font-black text-slate-800 mb-2">名前をつけて保存</h3>
+            <p class="text-slate-400 text-sm font-bold mb-6">作成する PDF のタイトルを入力してください。</p>
+            
+            <div class="mb-8">
+                <label class="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">ファイル名</label>
+                <div class="relative">
+                    <input type="text" id="fileNameInput" 
+                        class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-bold text-slate-700 focus:border-cyan-500 focus:outline-none transition-colors"
+                        placeholder="例：会議資料">
+                    <span class="absolute right-5 top-1/2 -translate-y-1/2 font-bold text-slate-300">.pdf</span>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="closeSaveModal()" class="flex-1 py-4 font-bold text-slate-400 hover:text-slate-600 transition">やめる</button>
+                <button onclick="confirmSave()" class="flex-[2] btn-kami justify-center py-4">
+                    <span>保存する</span>
+                    <span class="material-symbols-rounded">check_circle</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+        const { PDFDocument, degrees } = PDFLib;
+
+        let currentMode = 'split';
+        let loadedPagesData = []; 
+        let mergeFiles = [];
+        let selectedIndices = new Set();
+        let gridSortable = null;
+        let listSortable = null;
+
+        function switchMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            const tab = document.getElementById('tab' + mode.charAt(0).toUpperCase() + mode.slice(1));
+            if(tab) tab.classList.add('active');
+            resetApp();
+        }
+
+        function resetApp() {
+            document.getElementById('uploadSection').classList.remove('hidden');
+            document.getElementById('editorView').classList.add('hidden');
+            document.getElementById('mergeEditor').classList.add('hidden');
+            document.getElementById('pageGrid').innerHTML = '';
+            document.getElementById('mergeList').innerHTML = '';
+            document.getElementById('fileInputMain').value = '';
+            loadedPagesData = [];
+            mergeFiles = [];
+            selectedIndices.clear();
+            safeDestroySortable('grid');
+            safeDestroySortable('list');
+            updateUIStatus();
+            
+            const titles = {
+                split: "必要なページだけを取り出す",
+                reorder: "ページを自由に並べ替える",
+                rotate: "ページの向きを修正する",
+                merge: "複数のPDFを一つにくっつける"
+            };
+            document.getElementById('uploadText').innerHTML = titles[currentMode].replace("を", "を<br class='sm:hidden'>");
+        }
+
+        function safeDestroySortable(type) {
+            if (type === 'grid' && gridSortable) {
+                try { gridSortable.destroy(); } catch(e) {}
+                gridSortable = null;
+            }
+            if (type === 'list' && listSortable) {
+                try { listSortable.destroy(); } catch(e) {}
+                listSortable = null;
+            }
+        }
+
+        function showLoader(s, text = "仕上げています...") { 
+            document.getElementById('loader').classList.toggle('hidden', !s);
+            document.getElementById('loaderText').textContent = text;
+        }
+
+        function openSaveModal() {
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+            const defaultName = currentMode === 'merge' ? `紙わざ_結合_${dateStr}` : `紙わざ_編集_${dateStr}`;
+            document.getElementById('fileNameInput').value = defaultName;
+            document.getElementById('saveModal').classList.remove('hidden');
+            document.getElementById('fileNameInput').focus();
+        }
+
+        function closeSaveModal() {
+            document.getElementById('saveModal').classList.add('hidden');
+        }
+
+        function confirmSave() {
+            const fileName = document.getElementById('fileNameInput').value.trim() || "無題のPDF";
+            closeSaveModal();
+            if (currentMode === 'merge') processMerge(fileName);
+            else executeAction(fileName);
+        }
+
+        function updateUIStatus() {
+            const statusEl = document.getElementById('selectionStatus');
+            const btn = document.getElementById('actionBtn');
+            const btnText = document.getElementById('actionBtnText');
+            if (currentMode === 'split') {
+                statusEl.classList.remove('hidden');
+                statusEl.textContent = `${selectedIndices.size} ページ選びました`;
+                btn.disabled = selectedIndices.size === 0;
+                btnText.textContent = "選んだページを保存";
+            } else if (currentMode !== 'merge') {
+                statusEl.classList.add('hidden');
+                btn.disabled = loadedPagesData.length === 0;
+                btnText.textContent = currentMode === 'reorder' ? "この順番で保存" : "向きを確定して保存";
+            }
+        }
+
+        document.getElementById('dropZoneMain').onclick = () => document.getElementById('fileInputMain').click();
+        
+        document.getElementById('fileInputMain').onchange = (e) => {
+            if (currentMode === 'merge') {
+                handleMergeFiles(e.target.files);
+            } else {
+                handleFiles(e.target.files);
+            }
+        };
+
+        // 通常の編集用 (バラす・並べる・回す)
+        async function handleFiles(files) {
+            if (!files || files.length === 0) return;
+            showLoader(true, "読み込んでいます...");
+            const grid = document.getElementById('pageGrid');
+            const modeTitles = { split: 'ページを選んで取り出す', reorder: '順番を入れ替える', rotate: '向きを変える' };
+            const modeDesc = { 
+                split: '欲しいページをクリックしてください。', 
+                reorder: 'ドラッグして並べ替えられます。いらないページはゴミ箱で削除。', 
+                rotate: 'アイコンを押すと90度ずつ回ります。' 
+            };
+            document.getElementById('editorTitle').textContent = modeTitles[currentMode];
+            document.getElementById('editorDescription').textContent = modeDesc[currentMode];
+
+            try {
+                for (let f = 0; f < files.length; f++) {
+                    const file = files[f];
+                    const buffer = await file.arrayBuffer();
+                    const pdfDoc = await PDFDocument.load(buffer);
+                    const pdfJs = await pdfjsLib.getDocument({data: new Uint8Array(buffer)}).promise;
+
+                    for (let i = 1; i <= pdfJs.numPages; i++) {
+                        const page = await pdfJs.getPage(i);
+                        const viewport = page.getViewport({scale: 0.4});
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        await page.render({canvasContext: ctx, viewport: viewport}).promise;
+
+                        const originalRot = pdfDoc.getPage(i - 1).getRotation().angle || 0;
+                        const globalIdx = loadedPagesData.length;
+                        loadedPagesData.push({ pdfDoc, pageIndex: i - 1, rotation: originalRot });
+
+                        const card = document.createElement('div');
+                        card.className = 'page-card relative overflow-hidden group/card';
+                        card.dataset.globalIdx = globalIdx;
+                        card.innerHTML = `
+                            <div class="selection-check shadow-md"><span class="material-symbols-rounded text-sm">done</span></div>
+                            <div class="thumbnail-container p-4 aspect-[1/1.4] flex items-center justify-center cursor-pointer">
+                                <img src="${canvas.toDataURL()}" class="max-w-full max-h-full shadow-sm" style="transform: rotate(${originalRot}deg)">
+                            </div>
+                            <div class="px-4 py-3 bg-slate-50 flex items-center justify-between border-t border-slate-100">
+                                <span class="text-[10px] font-black text-slate-400">ページ ${i}</span>
+                                <div class="flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                                    ${currentMode === 'rotate' ? `
+                                        <button class="rotate-btn w-8 h-8 flex items-center justify-center hover:bg-white rounded-lg text-slate-500" title="右に回す"><span class="material-symbols-rounded text-lg">rotate_right</span></button>
+                                    ` : ''}
+                                    <button class="remove-btn w-8 h-8 flex items-center justify-center hover:bg-red-50 hover:text-red-500 rounded-lg text-slate-400" title="消す"><span class="material-symbols-rounded text-lg">delete</span></button>
+                                </div>
+                            </div>
+                        `;
+
+                        if(currentMode === 'split') {
+                            card.querySelector('.thumbnail-container').onclick = () => {
+                                if(selectedIndices.has(globalIdx)) selectedIndices.delete(globalIdx);
+                                else selectedIndices.add(globalIdx);
+                                card.classList.toggle('selected', selectedIndices.has(globalIdx));
+                                updateUIStatus();
+                            };
+                        }
+                        if(currentMode === 'rotate') {
+                            card.querySelector('.rotate-btn').onclick = (e) => {
+                                e.stopPropagation();
+                                loadedPagesData[globalIdx].rotation = (loadedPagesData[globalIdx].rotation + 90) % 360;
+                                card.querySelector('img').style.transform = `rotate(${loadedPagesData[globalIdx].rotation}deg)`;
+                            };
+                        }
+                        card.querySelector('.remove-btn').onclick = (e) => {
+                            e.stopPropagation();
+                            card.classList.add('scale-50', 'opacity-0');
+                            setTimeout(() => {
+                                card.remove();
+                                if(currentMode === 'split') { selectedIndices.delete(globalIdx); updateUIStatus(); }
+                            }, 300);
+                        };
+                        grid.appendChild(card);
+                    }
+                }
+                if(currentMode === 'reorder') {
+                    safeDestroySortable('grid');
+                    gridSortable = new Sortable(grid, { animation: 350, handle: '.thumbnail-container', ghostClass: 'opacity-10' });
+                }
+                document.getElementById('uploadSection').classList.add('hidden');
+                document.getElementById('editorView').classList.remove('hidden');
+                updateUIStatus();
+            } catch (err) { alert("読み込みに失敗しました。"); }
+            showLoader(false);
+        }
+
+        // 結合用
+        function handleMergeFiles(files) {
+            if (!files || files.length === 0) return;
+            Array.from(files).forEach(f => {
+                if (f.type === 'application/pdf') mergeFiles.push(f);
+            });
+            document.getElementById('uploadSection').classList.add('hidden');
+            document.getElementById('mergeEditor').classList.remove('hidden');
+            renderMergeList();
+        }
+
+        function renderMergeList() {
+            const list = document.getElementById('mergeList');
+            list.innerHTML = '';
+            mergeFiles.forEach((file, idx) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-5 bg-white border-2 border-slate-100 rounded-2xl cursor-grab hover:border-cyan-200 transition-colors shadow-sm group';
+                item.innerHTML = `
+                    <div class="flex items-center gap-4 overflow-hidden">
+                        <span class="material-symbols-rounded text-slate-300 group-hover:text-cyan-400 transition-colors" aria-hidden="true">drag_indicator</span>
+                        <div class="w-10 h-10 flex-shrink-0 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400">
+                             <span class="material-symbols-rounded text-xl">description</span>
+                        </div>
+                        <div class="overflow-hidden">
+                            <p class="font-bold text-slate-700 truncate">${file.name}</p>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase">${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                        </div>
+                    </div>
+                    <button onclick="removeMerge(${idx})" class="w-10 h-10 flex items-center justify-center hover:bg-red-50 hover:text-red-500 rounded-xl text-slate-300 transition-all" title="削除">
+                        <span class="material-symbols-rounded text-lg" aria-hidden="true">close</span>
+                    </button>
+                `;
+                list.appendChild(item);
+            });
+            document.getElementById('mergeBtn').disabled = mergeFiles.length < 2;
+            safeDestroySortable('list');
+            listSortable = new Sortable(list, { 
+                animation: 250,
+                onEnd: (e) => {
+                    const item = mergeFiles.splice(e.oldIndex, 1)[0];
+                    mergeFiles.splice(e.newIndex, 0, item);
+                }
+            });
+        }
+
+        function removeMerge(idx) { 
+            mergeFiles.splice(idx, 1); 
+            if (mergeFiles.length === 0) resetApp();
+            else renderMergeList(); 
+        }
+
+        async function processMerge(fileName) {
+            showLoader(true, "ひとつにまとめています...");
+            try {
+                const merged = await PDFDocument.create();
+                for (const file of mergeFiles) {
+                    const bytes = await file.arrayBuffer();
+                    const doc = await PDFDocument.load(bytes);
+                    const pages = await merged.copyPages(doc, doc.getPageIndices());
+                    pages.forEach(p => merged.addPage(p));
+                }
+                download(await merged.save(), `${fileName}.pdf`);
+            } catch (err) { alert("失敗しました。"); }
+            showLoader(false);
+        }
+
+        async function executeAction(fileName) {
+            showLoader(true, "PDFを作成しています...");
+            try {
+                const newPdf = await PDFDocument.create();
+                let pagesToProcess = [];
+                const currentCards = Array.from(document.querySelectorAll('#pageGrid .page-card'));
+                if (currentMode === 'split') {
+                    const validGlobalIndices = new Set(currentCards.map(c => parseInt(c.dataset.globalIdx)));
+                    pagesToProcess = Array.from(selectedIndices).filter(idx => validGlobalIndices.has(idx)).sort((a, b) => a - b).map(idx => loadedPagesData[idx]);
+                } else {
+                    pagesToProcess = currentCards.map(c => loadedPagesData[parseInt(c.dataset.globalIdx)]);
+                }
+                if (pagesToProcess.length === 0) throw new Error("ページが空っぽです");
+                for (const item of pagesToProcess) {
+                    const [copiedPage] = await newPdf.copyPages(item.pdfDoc, [item.pageIndex]);
+                    copiedPage.setRotation(degrees(item.rotation));
+                    newPdf.addPage(copiedPage);
+                }
+                download(await newPdf.save(), `${fileName}.pdf`);
+            } catch (err) { alert("保存できませんでした: " + err.message); }
+            showLoader(false);
+        }
+
+        function download(bytes, name) {
+            const blob = new Blob([bytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = name; a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ドラッグ&ドロップ処理の統合
+        const dz = document.getElementById('dropZoneMain');
+        dz.ondragover = (e) => { e.preventDefault(); dz.classList.add('drag-over'); };
+        dz.ondragleave = () => dz.classList.remove('drag-over');
+        dz.ondrop = (e) => {
+            e.preventDefault();
+            dz.classList.remove('drag-over');
+            if (currentMode === 'merge') {
+                handleMergeFiles(e.dataTransfer.files);
+            } else {
+                handleFiles(e.dataTransfer.files);
+            }
+        };
+    </script>
+</body>
+</html>
