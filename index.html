@@ -51,7 +51,7 @@
 
         .tab-btn.active {
             background: white;
-            color: var(--kami-secondary); /* エメラルドグリーンに変更 */
+            color: var(--kami-secondary);
             box-shadow: 0 4px 10px rgba(0,0,0,0.05);
         }
 
@@ -80,6 +80,11 @@
             background: white;
             border: 1px solid #e2e8f0;
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: grab;
+        }
+
+        .page-card:active {
+            cursor: grabbing;
         }
 
         .page-card:hover {
@@ -115,7 +120,7 @@
         }
 
         .btn-kami {
-            background: var(--kami-secondary); /* メインボタンもエメラルドに */
+            background: var(--kami-secondary);
             color: white;
             border-radius: 14px;
             padding: 14px 28px;
@@ -179,7 +184,7 @@
             </button>
             <button onclick="switchMode('reorder')" id="tabReorder" class="tab-btn">
                 <svg viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
-                <span>並める</span>
+                <span>整える</span> <!-- 「並める」から「整える」へ変更 -->
             </button>
             <button onclick="switchMode('rotate')" id="tabRotate" class="tab-btn">
                 <svg viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
@@ -252,6 +257,7 @@
         </section>
     </main>
 
+    <!-- ローダー -->
     <div id="loader" class="fixed inset-0 bg-slate-900/60 hidden flex items-center justify-center z-50 backdrop-blur-sm">
         <div class="bg-white p-10 rounded-[32px] flex flex-col items-center gap-5 shadow-2xl">
             <div class="loader-spin"></div>
@@ -259,6 +265,7 @@
         </div>
     </div>
 
+    <!-- 保存モーダル -->
     <div id="saveModal" class="fixed inset-0 bg-slate-900/60 hidden flex items-center justify-center z-[60] backdrop-blur-sm p-4">
         <div class="bg-white w-full max-w-md rounded-[32px] p-8 shadow-2xl modal-enter">
             <h3 class="text-2xl font-black text-slate-800 mb-2">名前をつけて保存</h3>
@@ -305,9 +312,17 @@
             loadedPagesData = [];
             mergeFiles = [];
             selectedIndices.clear();
-            if(gridSortable) gridSortable.destroy();
-            if(listSortable) listSortable.destroy();
+            if(gridSortable) { gridSortable.destroy(); gridSortable = null; }
+            if(listSortable) { listSortable.destroy(); listSortable = null; }
             updateUIStatus();
+            
+            const titles = {
+                split: "必要なページだけを取り出す",
+                reorder: "ページ順を整える",
+                rotate: "ページの向きを修正する",
+                merge: "複数のPDFを一つにくっつける"
+            };
+            document.getElementById('uploadText').innerHTML = titles[currentMode];
         }
 
         function showLoader(s, text = "仕上げています...") { 
@@ -337,9 +352,9 @@
             const btnText = document.getElementById('actionBtnText');
             if (currentMode === 'split') {
                 statusEl.classList.toggle('hidden', selectedIndices.size === 0);
-                statusEl.textContent = `${selectedIndices.size} ページ選択`;
+                statusEl.textContent = `${selectedIndices.size} ページ選択中`;
                 btn.disabled = selectedIndices.size === 0;
-                btnText.textContent = "選んだページを保存";
+                btnText.textContent = "選んだページを抽出";
             } else {
                 statusEl.classList.add('hidden');
                 btn.disabled = loadedPagesData.length === 0;
@@ -355,7 +370,7 @@
 
         async function handleFiles(files) {
             if (!files || files.length === 0) return;
-            showLoader(true, "読み込んでいます...");
+            showLoader(true, "職人が読み込んでいます...");
             const grid = document.getElementById('pageGrid');
             try {
                 for (let f = 0; f < files.length; f++) {
@@ -382,11 +397,11 @@
                         card.dataset.globalIdx = globalIdx;
                         card.innerHTML = `
                             <div class="selection-check shadow-md"><span class="material-symbols-rounded text-sm">done</span></div>
-                            <div class="thumbnail-container p-4 aspect-[1/1.4] flex items-center justify-center cursor-pointer">
-                                <img src="${canvas.toDataURL()}" class="max-w-full max-h-full shadow-sm" style="transform: rotate(${originalRot}deg)">
+                            <div class="thumbnail-container p-4 aspect-[1/1.4] flex items-center justify-center">
+                                <img src="${canvas.toDataURL()}" class="max-w-full max-h-full shadow-sm pointer-events-none" style="transform: rotate(${originalRot}deg)">
                             </div>
                             <div class="px-4 py-3 bg-slate-50 flex items-center justify-between border-t border-slate-100">
-                                <span class="text-[10px] font-black text-slate-400">P ${i}</span>
+                                <span class="text-[10px] font-black text-slate-400">${i} 枚目</span>
                                 <div class="flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
                                     ${currentMode === 'rotate' ? `<button class="rotate-btn w-7 h-7 flex items-center justify-center hover:bg-white rounded text-emerald-600"><span class="material-symbols-rounded text-base">rotate_right</span></button>` : ''}
                                     <button class="remove-btn w-7 h-7 flex items-center justify-center hover:bg-red-50 text-slate-400 hover:text-red-500 rounded"><span class="material-symbols-rounded text-base">delete</span></button>
@@ -421,7 +436,7 @@
                 document.getElementById('uploadSection').classList.add('hidden');
                 document.getElementById('editorView').classList.remove('hidden');
                 updateUIStatus();
-            } catch (err) { alert("Error loading PDF"); }
+            } catch (err) { alert("読み込みに失敗しました"); }
             showLoader(false);
         }
 
@@ -454,7 +469,7 @@
         }
 
         async function processMerge(fileName) {
-            showLoader(true);
+            showLoader(true, "ひとつに束ねています...");
             try {
                 const merged = await PDFDocument.create();
                 for (const file of mergeFiles) {
@@ -464,12 +479,12 @@
                     pages.forEach(p => merged.addPage(p));
                 }
                 download(await merged.save(), `${fileName}.pdf`);
-            } catch (err) { alert("Error merging"); }
+            } catch (err) { alert("結合に失敗しました"); }
             showLoader(false);
         }
 
         async function executeAction(fileName) {
-            showLoader(true);
+            showLoader(true, "新しく綴じています...");
             try {
                 const newPdf = await PDFDocument.create();
                 const cards = Array.from(document.querySelectorAll('#pageGrid .page-card'));
@@ -483,7 +498,7 @@
                     newPdf.addPage(p);
                 }
                 download(await newPdf.save(), `${fileName}.pdf`);
-            } catch (err) { alert("Error saving"); }
+            } catch (err) { alert("保存に失敗しました"); }
             showLoader(false);
         }
 
